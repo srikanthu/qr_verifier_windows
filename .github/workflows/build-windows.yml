@@ -1,9 +1,7 @@
 name: Build Windows Flutter App
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [ master ]
+  workflow_dispatch:   # 👈 manual trigger only
 
 jobs:
   build-windows:
