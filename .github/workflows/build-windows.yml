@@ -24,7 +24,7 @@ jobs:
         run: flutter pub get
 
       - name: Add Windows platform folder if missing
-        run: flutter create 
+        run: flutter create .
 
       - name: Build Windows release
         run: flutter build windows --release
