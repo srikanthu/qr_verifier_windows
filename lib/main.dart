@@ -32,10 +32,7 @@ class PlatformSelector extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Unsupported Platform')),
       body: const Center(
-        child: Text(
-          'This build supports only Web and Windows platforms.',
-          textAlign: TextAlign.center,
-        ),
+        child: Text('Only Windows and Web builds are supported.'),
       ),
     );
   }
