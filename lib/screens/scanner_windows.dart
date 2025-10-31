@@ -37,10 +37,10 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
       _controller = CameraController(cameras.first, ResolutionPreset.medium);
       await _controller!.initialize();
 
-      _controller!.startImageStream((CameraImage image) async {
+      _controller!.startImageStream((CameraImage frame) async {
         if (_decoding) return;
         _decoding = true;
-        await _decodeFrame(image);
+        await _decodeFrame(frame);
         _decoding = false;
       });
 
@@ -56,17 +56,18 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
       final plane = frame.planes.first;
       final bytes = plane.bytes;
 
+      // Correct Image.fromBytes syntax for image 4.2.0+
       final image = img.Image.fromBytes(
-        frame.width,
-        frame.height,
-        bytes,
-        format: img.Format.luminance,
+        width: frame.width,
+        height: frame.height,
+        bytes: Uint8List.fromList(bytes),
+        numChannels: 1, // grayscale
       );
 
       final luminanceSource = RGBLuminanceSource(
         image.width,
         image.height,
-        image.getBytes(format: img.Format.luminance),
+        image.getBytes(format: img.Format.rgb888),
       );
 
       final bitmap = BinaryBitmap(GlobalHistogramBinarizer(luminanceSource));
@@ -77,14 +78,15 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
         setState(() => _decoded = result.text);
       }
     } catch (_) {
-      // ignore frame errors
+      // Ignore bad frames
     }
   }
 
   void _onManualInput(String value) {
     setState(() => _decoded = value);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Manual input: $value')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Manual input: $value')),
+    );
   }
 
   @override
@@ -105,7 +107,7 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
               child: _isCameraReady
                   ? CameraPreview(_controller!)
                   : const Text(
-                      'No camera detected.\nUse USB QR reader for manual input.',
+                      'No camera detected.\nYou can use your USB QR reader (keyboard input).',
                       textAlign: TextAlign.center,
                     ),
             ),
