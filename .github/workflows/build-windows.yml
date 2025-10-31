@@ -20,21 +20,25 @@ jobs:
       - name: Enable Windows
         run: flutter config --enable-windows-desktop
 
+      - name: Clean old builds
+        run: flutter clean
+
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Add Windows platform folder if missing
-        run: flutter create .
+      - name: Ensure Windows platform folder exists
+        run: flutter create . --platforms=windows --overwrite
 
       - name: Build Windows release
-        run: flutter build windows --release
+        run: flutter build windows --release --target-platform=windows-x64
 
       - name: Zip artifact
-        run: powershell -Command "Compress-Archive -Path build\\windows\\x64\\runner\\Release\\* -DestinationPath build_windows_release.zip -Force"
-
+        run: |
+          $date = Get-Date -Format "yyyyMMdd_HHmm"
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath "SecureQR_Windows_$date.zip" -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-release
-          path: build_windows_release.zip
+          name: SecureQR_Windows
+          path: SecureQR_Windows_*.zip
