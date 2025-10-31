@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'dart:typed_data';
+import 'package:camera_windows/camera_windows.dart';
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
 import 'package:image/image.dart' as img;
 import 'package:zxing2/qrcode.dart';
-import 'package:zxing2/zxing2.dart';
+import 'package:zxing2/common.dart';
 
 class WindowsQRScanner extends StatefulWidget {
   const WindowsQRScanner({super.key});
@@ -13,9 +14,12 @@ class WindowsQRScanner extends StatefulWidget {
 }
 
 class _WindowsQRScannerState extends State<WindowsQRScanner> {
-  CameraController? _controller;
-  String? qrResult;
-  bool scanning = false;
+  CameraControllerWindows? _controller;
+  bool _isCameraAvailable = false;
+  String _decodedText = '';
+  bool _isScanning = false;
+  StreamSubscription? _frameSubscription;
+  final TextEditingController _manualInputController = TextEditingController();
 
   @override
   void initState() {
@@ -25,105 +29,129 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
 
   Future<void> _initCamera() async {
     try {
-      final cameras = await availableCameras();
-      if (cameras.isEmpty) {
-        setState(() => qrResult = "No cameras found");
-        return;
+      final cameras = await availableCamerasWindows();
+      if (cameras.isNotEmpty) {
+        _isCameraAvailable = true;
+        _controller = CameraControllerWindows(cameras.first);
+        await _controller!.initialize();
+        _startFrameStream();
+        setState(() {});
+      } else {
+        setState(() => _isCameraAvailable = false);
       }
-
-      _controller = CameraController(
-        cameras.first,
-        ResolutionPreset.medium,
-        enableAudio: false,
-      );
-      await _controller!.initialize();
-
-      setState(() => scanning = true);
-      _startScanLoop();
     } catch (e) {
-      setState(() => qrResult = "Camera init failed: $e");
+      debugPrint("Camera init failed: $e");
+      setState(() => _isCameraAvailable = false);
     }
   }
 
-  Future<void> _startScanLoop() async {
-    final reader = QRCodeReader();
+  void _startFrameStream() {
+    if (_controller == null) return;
 
-    while (scanning && mounted) {
+    _frameSubscription = _controller!.onLatestFrameStream.listen((CameraImageWindows frame) async {
+      if (_isScanning) return;
+      _isScanning = true;
+
       try {
-        final picture = await _controller!.takePicture();
-        final bytes = await picture.readAsBytes();
+        final buffer = frame.bytes;
+        if (buffer.isNotEmpty) {
+          // Convert raw bytes to grayscale image for decoding
+          final imgImage = img.Image.fromBytes(
+            frame.width,
+            frame.height,
+            Uint8List.fromList(buffer),
+            format: img.Format.luminance,
+          );
 
-        final decoded = img.decodeImage(bytes);
-        if (decoded == null) continue;
+          final luminanceSource = RGBLuminanceSource(
+              imgImage.width,
+              imgImage.height,
+              imgImage.getBytes(format: img.Format.luminance));
 
-        final width = decoded.width;
-        final height = decoded.height;
-
-        // Get raw RGBA bytes (no named parameters)
-        final pixels = decoded.getBytes();
-
-        // Convert 4-byte RGBA data to Int32 list
-        final intCount = Uint8List.fromList(pixels)
-            .buffer
-            .asInt32List(0, pixels.length ~/ 4);
-
-        final luminance = RGBLuminanceSource(width, height, intCount);
-        final bitmap = BinaryBitmap(GlobalHistogramBinarizer(luminance));
-
-        try {
+          final bitmap = BinaryBitmap(GlobalHistogramBinarizer(luminanceSource));
+          final reader = QRCodeReader();
           final result = reader.decode(bitmap);
-          if (result != null && result.text.isNotEmpty) {
+          if (result.text.isNotEmpty) {
             setState(() {
-              qrResult = result.text;
-              scanning = false;
+              _decodedText = result.text;
             });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("QR Detected: ${result.text}")),
-            );
           }
-        } catch (_) {
-          // ignore if no QR found in this frame
         }
       } catch (_) {
-        // ignore camera or decode errors, continue loop
+        // ignore failed frames
+      } finally {
+        _isScanning = false;
       }
-    }
+    });
   }
 
   @override
   void dispose() {
+    _frameSubscription?.cancel();
     _controller?.dispose();
+    _manualInputController.dispose();
     super.dispose();
+  }
+
+  void _handleManualEntry(String value) {
+    setState(() => _decodedText = value);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('QR Reader Input: $value')),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("SecureQR (Windows Verifier)")),
+      appBar: AppBar(
+        title: const Text('SecureQR (Windows Verifier)'),
+        actions: [
+          if (_isCameraAvailable)
+            IconButton(
+              icon: const Icon(Icons.cameraswitch),
+              onPressed: () async {
+                await _controller?.dispose();
+                await _initCamera();
+              },
+            ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
-            flex: 4,
-            child: Container(
-              color: Colors.black,
-              child: _controller?.value.isInitialized ?? false
-                  ? CameraPreview(_controller!)
-                  : const Center(child: CircularProgressIndicator()),
+            child: Center(
+              child: _isCameraAvailable
+                  ? CameraPreviewWindows(_controller!)
+                  : const Text(
+                      'No camera found.\nYou can use a USB QR reader (keyboard input).',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16),
+                    ),
             ),
           ),
-          Expanded(
-            flex: 1,
-            child: Container(
-              color: Colors.grey.shade100,
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              child: Center(
-                child: Text(
-                  qrResult ?? "Scanning...",
-                  style: const TextStyle(fontSize: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.grey[200],
+            child: Column(
+              children: [
+                if (!_isCameraAvailable)
+                  TextField(
+                    controller: _manualInputController,
+                    decoration: const InputDecoration(
+                      labelText: 'Scan or Paste QR Code Data',
+                      border: OutlineInputBorder(),
+                    ),
+                    onSubmitted: _handleManualEntry,
+                  ),
+                const SizedBox(height: 10),
+                Text(
+                  _decodedText.isEmpty
+                      ? 'Awaiting scan...'
+                      : 'Decoded SecureQR:\n$_decodedText',
                   textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 15),
                 ),
-              ),
+              ],
             ),
           ),
         ],
