@@ -1,5 +1,5 @@
 name: secure_qr_verifier_windows
-description: SecureQR verifier with Windows webcam and QR reader support
+description: SecureQR verifier for Windows desktop with webcam and USB QR reader
 publish_to: "none"
 version: 1.0.0+1
 
@@ -9,8 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  camera_windows: ^0.2.6+2
-  zxing2: ^0.2.1
+  camera_windows: ^0.2.6+1     # ✅ Works with Dart 3.3–3.4
+  zxing2: ^0.2.4               # ✅ Pure Dart QR decoding
   image: ^4.2.0
   http: ^1.2.0
 
