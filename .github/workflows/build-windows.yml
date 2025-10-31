@@ -1,13 +1,14 @@
-name: Build Windows Flutter App
+name: Build SecureQR (Windows + Web)
 
 on:
-  workflow_dispatch:   # 👈 manual trigger only
+  workflow_dispatch:   # manual trigger only
 
 jobs:
-  build-windows:
+  build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -27,16 +28,32 @@ jobs:
       - name: Ensure Windows platform folder exists
         run: flutter create --platforms=windows .
 
+      # 🟦 Windows build
       - name: Build Windows release
         run: flutter build windows --release
 
-      - name: Zip artifact
+      - name: Zip Windows build
         run: |
           $date = Get-Date -Format "yyyyMMdd_HHmm"
           Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath "SecureQR_Windows_$date.zip" -Force
 
-      - name: Upload artifact
+      - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: SecureQR_Windows
           path: SecureQR_Windows_*.zip
+
+      # 🌐 Web build
+      - name: Build Web release
+        run: flutter build web --release
+
+      - name: Zip Web build
+        run: |
+          $date = Get-Date -Format "yyyyMMdd_HHmm"
+          Compress-Archive -Path build\web\* -DestinationPath "SecureQR_Web_$date.zip" -Force
+
+      - name: Upload Web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecureQR_Web
+          path: SecureQR_Web_*.zip
