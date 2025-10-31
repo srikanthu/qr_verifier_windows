@@ -15,7 +15,7 @@ class WindowsQRScanner extends StatefulWidget {
 
 class _WindowsQRScannerState extends State<WindowsQRScanner> {
   CameraController? _controller;
-  bool _ready = false;
+  bool _isCameraReady = false;
   bool _decoding = false;
   String _decoded = '';
   final TextEditingController _manualController = TextEditingController();
@@ -23,14 +23,14 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
   @override
   void initState() {
     super.initState();
-    _initCamera();
+    _initializeCamera();
   }
 
-  Future<void> _initCamera() async {
+  Future<void> _initializeCamera() async {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        setState(() => _ready = false);
+        setState(() => _isCameraReady = false);
         return;
       }
 
@@ -40,35 +40,35 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
       _controller!.startImageStream((CameraImage frame) async {
         if (_decoding) return;
         _decoding = true;
-        await _decode(frame);
+        await _decodeFrame(frame);
         _decoding = false;
       });
 
-      setState(() => _ready = true);
+      setState(() => _isCameraReady = true);
     } catch (e) {
       debugPrint('Camera init failed: $e');
-      setState(() => _ready = false);
+      setState(() => _isCameraReady = false);
     }
   }
 
-  Future<void> _decode(CameraImage frame) async {
+  Future<void> _decodeFrame(CameraImage frame) async {
     try {
       final plane = frame.planes.first;
       final bytes = plane.bytes;
 
-      // Build a luminance (gray) image
+      // ✅ Correct modern constructor for image 4.x
       final image = img.Image.fromBytes(
-        frame.width,
-        frame.height,
-        bytes.buffer,
+        width: frame.width,
+        height: frame.height,
+        bytes: bytes.buffer.asUint8List(),
         numChannels: 1,
       );
 
-      // zxing2 0.2.2 needs a List<int> of ARGB pixels
-      final argbPixels = image.data; // already List<int>
+      // Convert pixel buffer to Int32List (ARGB)
+      final argbPixels = Int32List.fromList(image.data);
+
       final source = RGBLuminanceSource(image.width, image.height, argbPixels);
       final bitmap = BinaryBitmap(GlobalHistogramBinarizer(source));
-
       final reader = QRCodeReader();
       final result = reader.decode(bitmap);
 
@@ -76,12 +76,14 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
         setState(() => _decoded = result.text);
       }
     } catch (_) {
-      // ignore decoding errors
+      // ignore invalid frames
     }
   }
 
-  void _manual(String value) {
+  void _onManualInput(String value) {
     setState(() => _decoded = value);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Manual input: $value')));
   }
 
   @override
@@ -99,11 +101,12 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
         children: [
           Expanded(
             child: Center(
-              child: _ready
+              child: _isCameraReady
                   ? CameraPreview(_controller!)
                   : const Text(
-                      'No camera detected.\nUse your USB QR reader or paste manually.',
+                      'No camera detected.\nUse a USB QR reader or paste manually.',
                       textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16),
                     ),
             ),
           ),
@@ -112,14 +115,14 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                if (!_ready)
+                if (!_isCameraReady)
                   TextField(
                     controller: _manualController,
-                    onSubmitted: _manual,
                     decoration: const InputDecoration(
                       labelText: 'Scan or paste SecureQR data',
                       border: OutlineInputBorder(),
                     ),
+                    onSubmitted: _onManualInput,
                   ),
                 const SizedBox(height: 10),
                 Text(
