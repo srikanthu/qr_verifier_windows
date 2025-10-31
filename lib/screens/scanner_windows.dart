@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:camera_windows/camera_windows.dart';
+import 'package:camera/camera.dart';
 import 'package:image/image.dart' as img;
 import 'package:zxing2/qrcode.dart';
 import 'package:zxing2/common.dart';
@@ -14,12 +14,11 @@ class WindowsQRScanner extends StatefulWidget {
 }
 
 class _WindowsQRScannerState extends State<WindowsQRScanner> {
-  late final CameraWindows _camera;
-  StreamSubscription<CameraImageWindows>? _frameSub;
-  bool _cameraReady = false;
+  CameraController? _controller;
+  bool _isCameraReady = false;
   bool _decoding = false;
   String _decoded = '';
-  final _usbInputController = TextEditingController();
+  final TextEditingController _manualController = TextEditingController();
 
   @override
   void initState() {
@@ -29,33 +28,47 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
 
   Future<void> _initializeCamera() async {
     try {
-      final cameras = await availableCamerasWindows();
+      final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        setState(() => _cameraReady = false);
+        setState(() => _isCameraReady = false);
         return;
       }
 
-      _camera = CameraWindows(cameras.first);
-      await _camera.initialize();
-      setState(() => _cameraReady = true);
+      _controller = CameraController(cameras.first, ResolutionPreset.medium);
+      await _controller!.initialize();
 
-      _frameSub = _camera.onLatestFrameStream.listen((frame) {
+      _controller!.startImageStream((CameraImage image) async {
         if (_decoding) return;
         _decoding = true;
-        _decodeFrame(frame);
+        await _decodeFrame(image);
+        _decoding = false;
       });
+
+      setState(() => _isCameraReady = true);
     } catch (e) {
-      debugPrint('Camera initialization failed: $e');
-      setState(() => _cameraReady = false);
+      debugPrint('Camera init failed: $e');
+      setState(() => _isCameraReady = false);
     }
   }
 
-  Future<void> _decodeFrame(CameraImageWindows frame) async {
+  Future<void> _decodeFrame(CameraImage frame) async {
     try {
-      final bytes = Uint8List.fromList(frame.bytes);
-      final image = img.Image.fromBytes(frame.width, frame.height, bytes);
+      final plane = frame.planes.first;
+      final bytes = plane.bytes;
+
+      final image = img.Image.fromBytes(
+        frame.width,
+        frame.height,
+        bytes,
+        format: img.Format.luminance,
+      );
+
       final luminanceSource = RGBLuminanceSource(
-          image.width, image.height, image.getBytes(format: img.Format.rgb));
+        image.width,
+        image.height,
+        image.getBytes(format: img.Format.luminance),
+      );
+
       final bitmap = BinaryBitmap(GlobalHistogramBinarizer(luminanceSource));
       final reader = QRCodeReader();
       final result = reader.decode(bitmap);
@@ -64,24 +77,20 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
         setState(() => _decoded = result.text);
       }
     } catch (_) {
-      // ignore invalid frame
-    } finally {
-      _decoding = false;
+      // ignore frame errors
     }
   }
 
-  void _onUSBInput(String value) {
+  void _onManualInput(String value) {
     setState(() => _decoded = value);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('QR Reader Input: $value')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Manual input: $value')));
   }
 
   @override
   void dispose() {
-    _frameSub?.cancel();
-    _camera.dispose();
-    _usbInputController.dispose();
+    _controller?.dispose();
+    _manualController.dispose();
     super.dispose();
   }
 
@@ -93,27 +102,27 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
         children: [
           Expanded(
             child: Center(
-              child: _cameraReady
-                  ? CameraPreviewWindows(_camera)
+              child: _isCameraReady
+                  ? CameraPreview(_controller!)
                   : const Text(
-                      'No webcam detected.\nPlease use your USB QR reader instead.',
+                      'No camera detected.\nUse USB QR reader for manual input.',
                       textAlign: TextAlign.center,
                     ),
             ),
           ),
           Container(
             color: Colors.grey[200],
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                if (!_cameraReady)
+                if (!_isCameraReady)
                   TextField(
-                    controller: _usbInputController,
+                    controller: _manualController,
                     decoration: const InputDecoration(
                       labelText: 'Scan or paste SecureQR data',
                       border: OutlineInputBorder(),
                     ),
-                    onSubmitted: _onUSBInput,
+                    onSubmitted: _onManualInput,
                   ),
                 const SizedBox(height: 10),
                 Text(
