@@ -53,24 +53,23 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
 
   Future<void> _decodeFrame(CameraImage frame) async {
     try {
+      // Use the first plane (grayscale / luminance data)
       final plane = frame.planes.first;
       final bytes = plane.bytes;
 
-      // Correct Image.fromBytes syntax for image 4.2.0+
+      // Convert raw bytes to an Image
       final image = img.Image.fromBytes(
         width: frame.width,
         height: frame.height,
-        bytes: Uint8List.fromList(bytes),
-        numChannels: 1, // grayscale
+        bytes: bytes.buffer,
+        numChannels: 1, // single channel (gray)
       );
 
-      final luminanceSource = RGBLuminanceSource(
-        image.width,
-        image.height,
-        image.getBytes(format: img.Format.rgb888),
-      );
+      // Convert to RGB luminance for ZXing2
+      final pixels = image.getBytes();
+      final source = RGBLuminanceSource(image.width, image.height, pixels);
+      final bitmap = BinaryBitmap(GlobalHistogramBinarizer(source));
 
-      final bitmap = BinaryBitmap(GlobalHistogramBinarizer(luminanceSource));
       final reader = QRCodeReader();
       final result = reader.decode(bitmap);
 
@@ -78,7 +77,7 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
         setState(() => _decoded = result.text);
       }
     } catch (_) {
-      // Ignore bad frames
+      // ignore invalid frames
     }
   }
 
