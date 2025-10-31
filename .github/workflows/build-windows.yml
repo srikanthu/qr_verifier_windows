@@ -30,7 +30,7 @@ jobs:
         run: flutter create . --platforms=windows --overwrite
 
       - name: Build Windows release
-        run: flutter build windows --release --target-platform=windows-x64
+        run: flutter build windows --release
 
       - name: Zip artifact
         run: |
