@@ -53,31 +53,31 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
 
   Future<void> _decodeFrame(CameraImage frame) async {
     try {
-      // Use the first plane (grayscale / luminance data)
       final plane = frame.planes.first;
       final bytes = plane.bytes;
 
-      // Convert raw bytes to an Image
+      // Convert raw camera frame bytes into an image
       final image = img.Image.fromBytes(
         width: frame.width,
         height: frame.height,
         bytes: bytes.buffer,
-        numChannels: 1, // single channel (gray)
+        numChannels: 1, // grayscale single-channel
       );
 
-      // Convert to RGB luminance for ZXing2
-      final pixels = image.getBytes();
-      final source = RGBLuminanceSource(image.width, image.height, pixels);
-      final bitmap = BinaryBitmap(GlobalHistogramBinarizer(source));
+      // Convert pixel data (Uint32 RGBA) to Int32List for ZXing2
+      final pixels32 = Int32List.fromList(image.data);
 
+      // Create a luminance source for QR decoding
+      final source = RGBLuminanceSource(image.width, image.height, pixels32);
+      final bitmap = BinaryBitmap(GlobalHistogramBinarizer(source));
       final reader = QRCodeReader();
       final result = reader.decode(bitmap);
 
       if (result.text.isNotEmpty && result.text != _decoded) {
         setState(() => _decoded = result.text);
       }
-    } catch (_) {
-      // ignore invalid frames
+    } catch (e) {
+      // ignore invalid frames or decoding errors
     }
   }
 
@@ -108,6 +108,7 @@ class _WindowsQRScannerState extends State<WindowsQRScanner> {
                   : const Text(
                       'No camera detected.\nYou can use your USB QR reader (keyboard input).',
                       textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16),
                     ),
             ),
           ),
