@@ -1,5 +1,5 @@
 name: secure_qr_verifier_windows
-description: SecureQR verifier with Windows webcam and USB QR reader
+description: SecureQR verifier with Windows webcam and USB QR reader support
 publish_to: "none"
 version: 1.0.0+1
 
@@ -9,9 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  camera_windows: ^0.2.6+1
   camera: ^0.10.5+2
-  zxing2: ^0.2.4
+  camera_windows: ^0.2.6+1
+  zxing2: ^0.2.3
   image: ^4.2.0
   http: ^1.2.0
 
