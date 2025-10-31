@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:qr_code_dart_scan/qr_code_dart_scan.dart';
 
 class WebQRScanner extends StatefulWidget {
   const WebQRScanner({super.key});
@@ -9,59 +8,61 @@ class WebQRScanner extends StatefulWidget {
 }
 
 class _WebQRScannerState extends State<WebQRScanner> {
-  String? qrResult;
-  bool scanning = true;
+  final TextEditingController _controller = TextEditingController();
+  String _decoded = '';
+
+  void _onSimulateScan() {
+    setState(() => _decoded = _controller.text.trim());
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Simulated QR scan captured')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('SecureQR (Web Scanner)')),
-      body: Column(
-        children: [
-          Expanded(
-            flex: 3,
-            child: Container(
-              color: Colors.black,
-              child: scanning
-                  ? QRCodeDartScanView(
-                      scanInvertedQRCode: true,
-                      typeScan: TypeScan.live,
-                      onCapture: (Result result) {
-                        setState(() {
-                          qrResult = result.text;
-                          scanning = false;
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text('QR Detected: ${result.text}')),
-                        );
-                      },
-                    )
-                  : const Center(child: Text('Scan completed or stopped')),
+      appBar: AppBar(title: const Text('SecureQR Web Verifier')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            const Text(
+              'Web test mode:\nPaste QR payload below to simulate scan.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 15),
             ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Container(
-              color: Colors.grey.shade100,
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              child: Center(
-                child: Text(
-                  qrResult ?? "Show QR to webcam...",
-                  style: const TextStyle(fontSize: 16),
-                  textAlign: TextAlign.center,
+            const SizedBox(height: 10),
+            TextField(
+              controller: _controller,
+              decoration: const InputDecoration(
+                labelText: 'Paste or enter SecureQR data',
+                border: OutlineInputBorder(),
+              ),
+              minLines: 2,
+              maxLines: 4,
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.qr_code_2),
+              label: const Text('Simulate QR Scan'),
+              onPressed: _onSimulateScan,
+            ),
+            const SizedBox(height: 20),
+            if (_decoded.isNotEmpty)
+              Card(
+                elevation: 3,
+                margin: const EdgeInsets.all(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    'Decoded SecureQR:\n$_decoded',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14),
+                  ),
                 ),
               ),
-            ),
-          ),
-          if (!scanning)
-            ElevatedButton.icon(
-              onPressed: () => setState(() => scanning = true),
-              icon: const Icon(Icons.restart_alt),
-              label: const Text("Restart Scanner"),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
