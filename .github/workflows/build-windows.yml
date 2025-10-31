@@ -27,7 +27,7 @@ jobs:
         run: flutter pub get
 
       - name: Ensure Windows platform folder exists
-        run: flutter create . --platforms=windows --overwrite
+        run: flutter create --platforms=windows .
 
       - name: Build Windows release
         run: flutter build windows --release
