@@ -25,6 +25,11 @@ jobs:
       - name: Clear pub cache (fix zxing2 fetch)
         run: flutter pub cache repair
 
+      - name: Clean Flutter & Pub cache
+        run: |
+          flutter clean
+          flutter pub cache repair
+
       - name: Install dependencies
         run: flutter pub get
 
