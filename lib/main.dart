@@ -1,15 +1,15 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'screens/scanner_web.dart';
 import 'screens/scanner_windows.dart';
+import 'screens/scanner_web.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const SecureQRVerifierApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class SecureQRVerifierApp extends StatelessWidget {
+  const SecureQRVerifierApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +33,7 @@ class PlatformSelector extends StatelessWidget {
       appBar: AppBar(title: const Text('Unsupported Platform')),
       body: const Center(
         child: Text(
-          'This build is only supported on Web (for testing) and Windows.',
+          'This build supports only Web and Windows platforms.',
           textAlign: TextAlign.center,
         ),
       ),
