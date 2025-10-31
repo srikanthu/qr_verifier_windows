@@ -1,34 +1,32 @@
 name: Build Windows Flutter App
 
 on:
-  workflow_dispatch:       # manual trigger button
+  workflow_dispatch:
   push:
-    branches: [ master ]   # or main if your default branch is main
+    branches: [ master ]
 
 jobs:
   build-windows:
     runs-on: windows-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.6'   # Explicit stable version known to work
+          flutter-version: '3.19.6'
           channel: 'stable'
 
-      - name: Enable Windows desktop
+      - name: Enable Windows
         run: flutter config --enable-windows-desktop
 
-      - name: Get dependencies
+      - name: Install dependencies
         run: flutter pub get
 
       - name: Build Windows release
         run: flutter build windows --release
 
-      - name: Zip build output
+      - name: Zip artifact
         run: powershell -Command "Compress-Archive -Path build\\windows\\runner\\Release\\* -DestinationPath build_windows_release.zip -Force"
 
       - name: Upload artifact
